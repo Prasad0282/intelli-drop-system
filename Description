@@ -1,0 +1,17 @@
+We place special sensors, that check moisture levels.we can know the
+temperature, whether the water motor is running, ensuring to always stay in loop.
+The system adjusts watering schedules based on unique needs of crop of field.About
+Technologies Used-AI algorithms can analyse data from IOT sensors to predict issues like
+soil moisture levels, it allows timely maintenance. Automatic regulation of valves for release
+of water using AI.The Iot sensors in soil, irrigation pipes collect the data and is processed
+to make irrigation decisions by allowing the user to access the data on immediate
+adjustments based on conditions.
+Optimised resource usage, minimised environmental impact to improve
+productivity.Graphical User Interface-To monitor and intervene the system as needed while
+also trusting in AI’s decisions.the user can access the GUI in terms of increased crop yield,
+water savings and operational efficiency.Implementations:This can be implemented with
+two stages.
+Injecting sensors data, time data and various other factors,
+bluetooth and wifi modules for wireless connection into arduino to automate it.
+There are different real time scenarios for which the system can let you to sit back and
+relax knowing that our system has got it all under control.
