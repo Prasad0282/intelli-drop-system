@@ -1,0 +1,219 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <DHT.h>
+#include <ArduinoJson.h> // Library for JSON support
+
+const char* ssid = "Only For You";
+const char* password = "mohan.81";
+
+// DHT sensor configuration
+#define DHTPIN D5        // Define the pin where the DHT11 sensor is connected
+#define DHTTYPE DHT11    // Set the type of DHT sensor you are using (DHT11 or DHT22)
+
+DHT dht(DHTPIN, DHTTYPE);
+
+// Soil moisture sensor configuration
+const int soilMoisturePin = A0; // Analog pin where the soil moisture sensor is connected
+
+// Threshold values
+const float humidityThreshold = 95.0;
+const float temperatureMin = 20.0;
+const float temperatureMax = 35.0;
+const int soilMoistureThreshold = 60;
+
+// Relay pin
+const int relayPin = D1; // GPIO pin for relay module control
+
+ESP8266WebServer server(80);
+
+bool pumpStatus = false; // Initially, the pump is off
+
+void handleRoot();
+void setup() {
+  Serial.begin(9600);
+
+  // Connect to Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi");
+
+  // Print ESP8266's IP address
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP()); // Print the IP address to the Serial Monitor
+
+  // Set relay pin as an output
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW); // Turn off the water pump initially
+
+  // Initialize DHT sensor
+  dht.begin();
+
+  // Define server routes
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/api/data", HTTP_GET, handleData); // API endpoint for fetching data
+  server.on("/togglePump", HTTP_GET, togglePump); // Endpoint to toggle the water pump
+
+  // Start server
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+void loop() {
+  server.handleClient();
+
+  // Read sensor values
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+  int soilMoisture =  analogRead(soilMoisturePin); // Read soil moisture analog value
+
+  // Map the soil moisture reading to a range (0-100%)
+  int soilMoisturePercentage =  100 - map(soilMoisture, 0, 1023, 0, 100);
+ // int soilMoisturePercent= 100 - soilMoisturePercentage;
+  // Check conditions to turn on/off the water pump
+  if (humidity < humidityThreshold && temperature >= temperatureMin && temperature <= temperatureMax && soilMoisturePercentage < soilMoistureThreshold) {
+    pumpStatus = true; // Turn on the water pump
+    digitalWrite(relayPin, LOW);
+  } else {
+    pumpStatus = false; // Turn off the water pump
+    digitalWrite(relayPin, HIGH);
+  }
+
+  // Delay for a moment before reading sensors again
+  delay(2000); // Adjust the delay time as needed
+}
+
+void handleRoot() {
+  // Serve the HTML page with improved layout
+  server.send(200, "text/html", getPage());
+}
+
+void handleData() {
+  // Create a JSON object with sensor data
+  DynamicJsonDocument jsonDoc(1024);
+  jsonDoc["humidity"] = dht.readHumidity();
+  jsonDoc["temperature"] = dht.readTemperature();
+  jsonDoc["soilMoisture"] = map(analogRead(soilMoisturePin), 0, 1023, 0, 100);
+  jsonDoc["waterPumpStatus"] = pumpStatus; // Include the current pump status
+
+  // Serialize JSON to a string
+  String jsonData;
+  serializeJson(jsonDoc, jsonData);
+
+  // Send the JSON response
+  server.send(200, "application/json", jsonData);
+}
+
+String getPage() {
+  // Create an HTML page with improved layout
+  String page = "<!DOCTYPE html><html><head>";
+  page += "<style>";
+  page += "body {";
+  page += "  background-image: url('');"; // Replace 'YOUR_FILE_ID' with the actual file ID from your Google Drive
+  page += "  background-size: cover;";
+  page += "  background-repeat: no-repeat;";
+  page += "  text-align: center;";
+  page += "  background-color: black;"; // Background color for the entire page
+  page += "}";
+  page += ".container {";
+  page += "  display: flex;";
+  page += "  flex-direction: column;";
+  page += "  align-items: center;";
+  page += "  justify-content: center;";
+  page += "  height: 80vh;";
+  page += "}";
+  page += ".box {";
+  page += "  background-color: #20e353;"; // Background color for boxes
+  page += "  border: 2px solid #3b7d3d;"; // Box border color
+  page += "  padding: 10px;";
+  page += "  margin: 10px;";
+  page += "  width: 80%;";
+  page += "  border-radius: 10px;"; // Add rounded corners to boxes
+  page += "}";
+  page += ".on {";
+  page += "  background-color: green;";
+  page += "  color: white;";
+  page += "}";
+  page += ".off {";
+  page += "  background-color: red;";
+  page += "  color: white;";
+  page += "}";
+  page += ".button {";
+  page += "  padding: 10px 20px;";
+  page += "  border: none;";
+  page += "  cursor: pointer;";
+  page += "}";
+  page += ".on-button {";
+  page += "  background-color: green;";
+  page += "  color: white;";
+  page += "}";
+  page += ".off-button {";
+  page += "  background-color: red;";
+  page += "  color: white;";
+  page += "}";
+  page += ".title {";
+  page += "  color: #15ed5d;"; // ADI text color (green)
+  page += "  font-size: 24px;"; // Adjust the font size as needed
+  page += "  font-weight: bold;"; // Make the title bold
+  page += "}";
+  page += ".adi-text, .sensor-reading, .water-pump-status {";
+  page += "  color: white;"; // Text color for ADI, Sensor Readings, and Water Pump Status
+  page += "}";
+  page += "</style>";
+  page += "</head><body>";
+  page += "<div class='container'>";
+  page += "<h1 class='title'>ADI</h1>"; // Apply the 'title' class to the title
+  page += "<p class='adi-text'>Automated Drip Irrigation</p>";
+  page += "<div class='box' id='sensorBox'>";
+  page += "<h2 class='sensor-reading'>Sensor Readings</h2>";
+  page += "<p id='humidity' class='sensor-reading'>Humidity: -%</p>";
+  page += "<p id='temperature' class='sensor-reading'>Temperature: -°C</p>";
+  page += "<p id='soilMoisture' class='sensor-reading'>dryness: -%</p>";
+  page += "</div>";
+  page += "<div class='box' id='pumpStatusBox'>";
+  page += "<h2 class='water-pump-status'>Water Pump Status</h2>";
+  page += "<button class='button' id='pumpButton' onclick='togglePump()'></button>";
+  page += "</div>";
+  page += "<p class='adi-text'>By- Dynamic Evolvers</p>";
+  page += "</div>";
+  page += "<script>";
+  page += "function togglePump() {";
+  page += "  fetch('/togglePump')";
+  page += "    .then(response => response.text())";
+  page += "    .then(data => {";
+  page += "      document.getElementById('pumpButton').innerText = data;";
+  page += "      document.getElementById('pumpButton').className = data === 'On' ? 'button on-button' : 'button off-button';";
+  page += "    });";
+  page += "}";
+  page += "setInterval(function() {";
+  page += "  fetch('/api/data')";
+  page += "    .then(response => response.json())";
+  page += "    .then(data => {";
+  page += "      document.getElementById('humidity').innerText = 'Humidity: ' + data.humidity + '%';";
+  page += "      document.getElementById('temperature').innerText = 'Temperature: ' + data.temperature + '°C';";
+  page += "      document.getElementById('soilMoisture').innerText = 'dryness: ' + data.soilMoisture + '%';";
+  page += "      document.getElementById('pumpButton').innerText = data.waterPumpStatus ? 'On' : 'Off';";
+  page += "      document.getElementById('pumpButton').className = data.waterPumpStatus ? 'button on-button' : 'button off-button';";
+  page += "    });";
+  page += "}, 2000);"; // Fetch data every 2 seconds
+  page += "</script></body></html>";
+
+  return page;
+}
+
+void togglePump() {
+  // Toggle the pump status when the endpoint is called
+  pumpStatus = !pumpStatus;
+
+  // Update the relay based on the new pumpStatus
+  digitalWrite(relayPin, pumpStatus ? LOW : HIGH);
+
+  // Send the current pump status as a response
+  server.send(200, "text/plain", pumpStatus ? "Off" : "On");
+}
+
+void handleNotFound() {
+  server.send(404, "text/plain", "Not Found");
+}
